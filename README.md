@@ -19,7 +19,7 @@ A simple Python script to compress MP4 videos to target sizes of **5, 10, 15, or
 Install Python dependencies:
 ```bash
 pip install -r requirements.txt
-
+```
 
 ## How to use it
 ```bash

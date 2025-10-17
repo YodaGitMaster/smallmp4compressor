@@ -23,5 +23,5 @@ pip install -r requirements.txt
 
 ## How to use it
 ```bash
-python compress_mp4.py vacation.mp4 10
+python compress_mp4.py "myvideo.mp4" 10
 ```

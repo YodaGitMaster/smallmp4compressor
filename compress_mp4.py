@@ -2,11 +2,27 @@ import os
 import subprocess
 import sys
 
-def get_duration(input_file):
+def get_ffmpeg_paths():
+    """Locate ffmpeg and ffprobe in local bin folder or system PATH."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    local_bin = os.path.join(here, "bin")
+
+    ffmpeg_path = os.path.join(local_bin, "ffmpeg.exe")
+    ffprobe_path = os.path.join(local_bin, "ffprobe.exe")
+
+    if not os.path.isfile(ffmpeg_path) or not os.path.isfile(ffprobe_path):
+        # fallback to system PATH
+        ffmpeg_path = "ffmpeg"
+        ffprobe_path = "ffprobe"
+
+    return ffmpeg_path, ffprobe_path
+
+
+def get_duration(input_file, ffprobe_path):
     """Return duration of video in seconds using ffprobe."""
     result = subprocess.run(
         [
-            "ffprobe", "-v", "error", "-show_entries",
+            ffprobe_path, "-v", "error", "-show_entries",
             "format=duration", "-of",
             "default=noprint_wrappers=1:nokey=1", input_file
         ],
@@ -18,27 +34,28 @@ def get_duration(input_file):
         return float(result.stdout.strip())
     except ValueError:
         print("❌ Could not determine duration.")
+        print(result.stderr)
         sys.exit(1)
 
-def compress_video(input_file, target_mb):
+
+def compress_video(input_file, target_mb, ffmpeg_path, ffprobe_path):
     """Compress MP4 to target size in MB."""
-    duration = get_duration(input_file)
+    duration = get_duration(input_file, ffprobe_path)
     target_bitrate = (target_mb * 8192) / duration  # MB → Kbps
 
-    # Split between video and audio bitrate
     audio_bitrate = 128  # Kbps
     video_bitrate = max(target_bitrate - audio_bitrate, 100)
 
-    base, ext = os.path.splitext(input_file)
-    output_file = f"{base}_compressed_{target_mb}MB.mp4"
+    base, _ = os.path.splitext(input_file)
+    output_file = f"{base}_compressed_{int(target_mb)}MB.mp4"
 
     print(f"🎬 Duration: {duration:.2f}s")
-    print(f"🎯 Target size: {target_mb} MB")
+    print(f"🎯 Target: {target_mb} MB")
     print(f"📊 Target bitrate: {target_bitrate:.1f} Kbps")
-    print(f"🎥 Video bitrate: {video_bitrate:.1f} Kbps | 🔊 Audio bitrate: {audio_bitrate} Kbps")
+    print(f"🎥 Video bitrate: {video_bitrate:.1f} Kbps | 🔊 Audio: {audio_bitrate} Kbps")
 
     command = [
-        "ffmpeg", "-y", "-i", input_file,
+        ffmpeg_path, "-y", "-i", input_file,
         "-vcodec", "libx264", "-b:v", f"{video_bitrate}k",
         "-acodec", "aac", "-b:a", f"{audio_bitrate}k",
         "-movflags", "+faststart",
@@ -47,12 +64,12 @@ def compress_video(input_file, target_mb):
     ]
 
     subprocess.run(command)
-    print(f"✅ Compression complete: {output_file}")
+    print(f"✅ Done: {output_file}")
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Usage: python compress_mp4.py <input.mp4> <target_size_mb>")
-        print("Example: python compress_mp4.py video.mp4 10")
         sys.exit(1)
 
     input_file = sys.argv[1]
@@ -63,7 +80,8 @@ if __name__ == "__main__":
         sys.exit(1)
 
     if target_size not in [5, 10, 15, 25]:
-        print("⚠️  Allowed target sizes: 5, 10, 15, 25 MB")
+        print("⚠️ Allowed targets: 5, 10, 15, 25 MB")
         sys.exit(1)
 
-    compress_video(input_file, target_size)
+    ffmpeg_path, ffprobe_path = get_ffmpeg_paths()
+    compress_video(input_file, target_size, ffmpeg_path, ffprobe_path)
